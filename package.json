@@ -1,0 +1,25 @@
+{
+  "name": "bunchoid",
+  "version": "0.0.3",
+  "description": "Library for grouping/caching function calls.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [],
+  "author": "Tomas Savigliano <ralusek@gmail.com>",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/jest": "^29.5.1",
+    "@types/node": "^18.16.3",
+    "jest": "^29.5.0",
+    "ts-jest": "^29.1.0",
+    "typescript": "^5.1.6"
+  },
+  "files": [
+    "dist"
+  ]
+}
