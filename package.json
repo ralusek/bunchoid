@@ -1,6 +1,6 @@
 {
   "name": "bunchoid",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Library for grouping/caching function calls.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
