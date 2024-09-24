@@ -1,71 +1,83 @@
 // Types
 import { ExecutionPath, BunchoidConfig, BunchoidExecution } from './types';
 
-const executions = {
-  children: new Map<any, ExecutionPath>(),
-  parent: null,
-};
+const globalIsolate = isolate();
+
+export default globalIsolate;
+export const getExecutionPathMeta = globalIsolate.getExecutionPathMeta;
+
 const timeouts = new WeakMap<BunchoidExecution<any>, NodeJS.Timeout>();
 
+export function isolate() {
+  const executions = {
+    children: new Map<any, ExecutionPath>(),
+    parent: null,
+  };
 
-export function bunchoid<T, P>(fn: () => T | Promise<T>, config: Omit<BunchoidConfig<P>, 'includeMeta'> & { includeMeta: false }): Promise<T>;
-export function bunchoid<T, P>(fn: () => T | Promise<T>, config: Omit<BunchoidConfig<P>, 'includeMeta'> & { includeMeta: undefined }): Promise<T>;
-export function bunchoid<T, P>(fn: () => T | Promise<T>, config: Omit<BunchoidConfig<P>, 'includeMeta'> & { includeMeta: true }): Promise<{ payloads: P[]; result: T; invokeCount: number; }>;
-export default async function bunchoid<T, P>(
-  fn: () => T | Promise<T>,
-  {
-    key,
-    wait,
-    payload,
-    maxWait = 1000 * 60,
-    includeMeta = false,
-  }: BunchoidConfig<P>,
-) {
-  const executionPath = findOrCreateExecutionPath(key);
+  function bunchoid<T, P>(fn: () => T | Promise<T>, config: Omit<BunchoidConfig<P>, 'includeMeta'> & { includeMeta: false }): Promise<T>;
+  function bunchoid<T, P>(fn: () => T | Promise<T>, config: Omit<BunchoidConfig<P>, 'includeMeta'> & { includeMeta: undefined }): Promise<T>;
+  function bunchoid<T, P>(fn: () => T | Promise<T>, config: Omit<BunchoidConfig<P>, 'includeMeta'> & { includeMeta: true }): Promise<{ payloads: P[]; result: T; invokeCount: number; }>;
+  async function bunchoid<T, P>(
+    fn: () => T | Promise<T>,
+    {
+      key,
+      wait,
+      payload,
+      maxWait = 1000 * 60,
+      includeMeta = false,
+    }: BunchoidConfig<P>,
+  ) {
+    const executionPath = findOrCreateExecutionPath(key, executions);
 
-  if (!executionPath.execution) executionPath.execution = createExecution({ key, wait, maxWait });
-  else updateExecution(executionPath.execution, { wait, maxWait });
+    if (!executionPath.execution) executionPath.execution = createExecution({ key, wait, maxWait });
+    else updateExecution(executionPath.execution, { wait, maxWait });
 
-  executionPath.execution.invokeCount += 1;
+    executionPath.execution.invokeCount += 1;
 
-  const payloads = executionPath.execution.payloads;
-  if (payload !== undefined) payloads.push(payload);
+    const payloads = executionPath.execution.payloads;
+    if (payload !== undefined) payloads.push(payload);
 
-  clearTimeout(timeouts.get(executionPath.execution));
+    clearTimeout(timeouts.get(executionPath.execution));
 
-  const timeout = setTimeout(async () => {
-    const execution = executionPath.execution!;
-    executionPath.execution = undefined;
-    timeouts.delete(execution); // Probably not necessary because WeakMap
-    
-    prunePath(executionPath);
+    const timeout = setTimeout(async () => {
+      const execution = executionPath.execution!;
+      executionPath.execution = undefined;
+      timeouts.delete(execution); // Probably not necessary because WeakMap
+      
+      prunePath(executionPath);
 
-    try {
-      const result = await fn();
-      execution.resolve(includeMeta ? { payloads, result, invokeCount: execution.invokeCount } : result);
-    }
-    catch (error) {
-      execution.reject(includeMeta ? { payloads, error, invokeCount: execution.invokeCount } : error);
-    }
-  }, executionPath.execution.scheduledAt - Date.now());
- 
-  timeouts.set(executionPath.execution, timeout);
+      try {
+        const result = await fn();
+        execution.resolve(includeMeta ? { payloads, result, invokeCount: execution.invokeCount } : result);
+      }
+      catch (error) {
+        execution.reject(includeMeta ? { payloads, error, invokeCount: execution.invokeCount } : error);
+      }
+    }, executionPath.execution.scheduledAt - Date.now());
+  
+    timeouts.set(executionPath.execution, timeout);
 
-  return executionPath.execution.promise;
-}
-
-export function getExecutionPathMeta(key: any[]) {
-  let current: ExecutionPath | null = executions;
-  for (const value of key) {
-    current = current.children.get(value)!;
-    if (!current) return null;
+    return executionPath.execution.promise;
   }
 
-  return {
-    execution: current.execution ? { ...current.execution } : undefined,
-    childrenCount: current.children.size,
-  };
+  function getExecutionPathMeta(key: any[]) {
+    let current: ExecutionPath | null = executions;
+    for (const value of key) {
+      current = current.children.get(value)!;
+      if (!current) return null;
+    }
+  
+    return {
+      execution: current.execution ? { ...current.execution } : undefined,
+      childrenCount: current.children.size,
+    };
+  }
+
+  bunchoid.getExecutionPathMeta = getExecutionPathMeta;
+
+  return bunchoid;
 }
+
 
 function createExecution<P>({
   key,
@@ -113,7 +125,7 @@ function updateExecution<P>(execution: BunchoidExecution<P>, { wait, maxWait }: 
 // the key for a single hash lookup is because we want the keys to be able to
 // be non-string values. This way, anything that can be a map key can be a
 // bunchoid key.
-function findOrCreateExecutionPath(key: any[]) {
+function findOrCreateExecutionPath(key: any[], executions: ExecutionPath) {
   let current: ExecutionPath = executions;
   key.forEach((value) => {
     const found = current.children.get(value);
