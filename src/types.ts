@@ -17,6 +17,14 @@ export type BunchoidExecution<P> = {
   scheduledAt: number;
 };
 
+export type BunchoidExecutionArgs<P> = {
+  key: any;
+  payloads: P[];
+  invokeCount: number;
+  createdAt: number;
+  scheduledAt: number;
+};
+
 export type ExecutionPath = {
   execution?: BunchoidExecution<any>;
   children: Map<any, ExecutionPath>;

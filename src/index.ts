@@ -1,5 +1,5 @@
 // Types
-import { ExecutionPath, BunchoidConfig, BunchoidExecution } from './types';
+import { ExecutionPath, BunchoidConfig, BunchoidExecution, BunchoidExecutionArgs } from './types';
 
 const globalIsolate = isolate();
 
@@ -8,7 +8,13 @@ export const getExecutionPathMeta = globalIsolate.getExecutionPathMeta;
 
 const timeouts = new WeakMap<BunchoidExecution<any>, NodeJS.Timeout>();
 
-export function isolate() {
+export function isolate(
+  defaults: {
+    wait?: number;
+    maxWait?: number;
+    includeMeta?: boolean;
+  } = {},
+) {
   const executions = {
     children: new Map<any, ExecutionPath>(),
     parent: null,
@@ -16,15 +22,16 @@ export function isolate() {
 
   function bunchoid<T, P>(fn: () => T | Promise<T>, config: Omit<BunchoidConfig<P>, 'includeMeta'> & { includeMeta: false }): Promise<T>;
   function bunchoid<T, P>(fn: () => T | Promise<T>, config: Omit<BunchoidConfig<P>, 'includeMeta'> & { includeMeta: undefined }): Promise<T>;
+  function bunchoid<T, P>(fn: () => T | Promise<T>, config: Omit<BunchoidConfig<P>, 'includeMeta'>): Promise<T>;
   function bunchoid<T, P>(fn: () => T | Promise<T>, config: Omit<BunchoidConfig<P>, 'includeMeta'> & { includeMeta: true }): Promise<{ payloads: P[]; result: T; invokeCount: number; }>;
   async function bunchoid<T, P>(
-    fn: () => T | Promise<T>,
+    fn: (a: BunchoidExecutionArgs<P>) => T | Promise<T>,
     {
       key,
-      wait,
+      wait = defaults.wait ?? 250,
       payload,
-      maxWait = 1000 * 60,
-      includeMeta = false,
+      maxWait = defaults.maxWait ?? 15_000,
+      includeMeta = defaults.includeMeta ?? false,
     }: BunchoidConfig<P>,
   ) {
     const executionPath = findOrCreateExecutionPath(key, executions);
@@ -35,7 +42,7 @@ export function isolate() {
     executionPath.execution.invokeCount += 1;
 
     const payloads = executionPath.execution.payloads;
-    if (payload !== undefined) payloads.push(payload);
+    payloads.push(payload);
 
     clearTimeout(timeouts.get(executionPath.execution));
 
@@ -47,7 +54,13 @@ export function isolate() {
       prunePath(executionPath);
 
       try {
-        const result = await fn();
+        const result = await fn({
+          payloads: execution.payloads.slice(),
+          invokeCount: execution.invokeCount,
+          key: execution.key.slice(),
+          createdAt: execution.createdAt,
+          scheduledAt: execution.scheduledAt,
+        });
         execution.resolve(includeMeta ? { payloads, result, invokeCount: execution.invokeCount } : result);
       }
       catch (error) {
