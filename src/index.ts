@@ -20,10 +20,10 @@ export function isolate(
     parent: null,
   };
 
-  function bunchoid<T, P>(fn: () => T | Promise<T>, config: Omit<BunchoidConfig<P>, 'includeMeta'> & { includeMeta: false }): Promise<T>;
-  function bunchoid<T, P>(fn: () => T | Promise<T>, config: Omit<BunchoidConfig<P>, 'includeMeta'> & { includeMeta: undefined }): Promise<T>;
-  function bunchoid<T, P>(fn: () => T | Promise<T>, config: Omit<BunchoidConfig<P>, 'includeMeta'>): Promise<T>;
-  function bunchoid<T, P>(fn: () => T | Promise<T>, config: Omit<BunchoidConfig<P>, 'includeMeta'> & { includeMeta: true }): Promise<{ payloads: P[]; result: T; invokeCount: number; }>;
+  function bunchoid<T, P>(fn: (a: BunchoidExecutionArgs<P>) => T | Promise<T>, config: Omit<BunchoidConfig<P>, 'includeMeta'> & { includeMeta: false }): Promise<T>;
+  function bunchoid<T, P>(fn: (a: BunchoidExecutionArgs<P>) => T | Promise<T>, config: Omit<BunchoidConfig<P>, 'includeMeta'> & { includeMeta: undefined }): Promise<T>;
+  function bunchoid<T, P>(fn: (a: BunchoidExecutionArgs<P>) => T | Promise<T>, config: Omit<BunchoidConfig<P>, 'includeMeta'>): Promise<T>;
+  function bunchoid<T, P>(fn: (a: BunchoidExecutionArgs<P>) => T | Promise<T>, config: Omit<BunchoidConfig<P>, 'includeMeta'> & { includeMeta: true }): Promise<{ payloads: P[]; result: T; invokeCount: number; }>;
   async function bunchoid<T, P>(
     fn: (a: BunchoidExecutionArgs<P>) => T | Promise<T>,
     {
